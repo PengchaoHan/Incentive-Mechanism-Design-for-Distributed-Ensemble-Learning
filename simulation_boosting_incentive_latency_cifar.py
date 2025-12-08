@@ -15,18 +15,20 @@ np.random.seed(seed)  # numpy
 
 cost_mean = 0.0001
 cost_var = 0.00001
-gamma_list = [200*i for i in range(5, 40)]
-gamma_list = [10000*i for i in range(5, 200)]
+
+# gamma_list = [100000*i for i in range(5, 200)]
+gamma_list = [10000*i for i in range(1, 150)]
+
 
 # cost = np.random.normal(cost_mean, cost_var, num_of_base_learners)
 
-cost = np.array([0.000005+0.000005*i for i in range(num_of_base_learners)])
+cost = np.array([0.00005+0.00005*i for i in range(num_of_base_learners)])
 
 # D_max = np.array([600 for i in range(num_of_base_learners)])
 D_max = np.array([60000 for i in range(num_of_base_learners)])
 
 # latency
-rate_mean_list = [200*i for i in range(1,5)]
+rate_mean_list = [100*i for i in range(1,5)]
 rate_var = 1
 rate_list = []
 for i in range(len(rate_mean_list)):
@@ -51,15 +53,16 @@ def func_el_accu_df_(data, a,b,c,d,e,f,g,h,i):
     return (a*np.log(x*b+c)+d)*(e*np.log(y*f+g) + h) +i
 
 
-def func_el_accu_df(data):
-    n, d = data  # x: N, y: D
-    # d = np.sum(d)/n
-    ensemble_accuracy_array = func_el_accu_df_((n,d), 0.017749425685800763, 0.348536652178585,
-                                              0.9419147131478688, -0.003227050156905226, 1.0671960373713296,
-                                              3.1827612596767136, 54294.42813178671, -11.539329543237468, 0.8976441356676684
-)
-
-    return ensemble_accuracy_array
+# def func_el_accu_df(data):
+#     n, d = data  # x: N, y: D
+#     # d = np.sum(d)/n
+#     ensemble_accuracy_array = func_el_accu_df_((n,d), 0.0044145838718573005, 2.4199621846176718, -9.358549381594225,
+#                                                -0.0021343287506015393, 0.8230846500651495, 8.918735346567555,
+#                                                -6780.2508090106, -4.735240198444417, 0.679906360529727
+#
+# )
+#
+#     return ensemble_accuracy_array
 
 # def func_el_accu_real(data):
 #     n, d = data  # x: N, y: D
@@ -74,20 +77,22 @@ def func_el_accu_df(data):
 def func_el_accu_real(data):
     n, d = data  # x: N, y: D
     # d = np.sum(d)/n
-    ensemble_accuracy_array = func_el_accu_real_((n,d), 0.0018323953565850465, 8.4572955162576e-15, -1.6914380056519294e-14,
-    0.1258615493027215, 0.293802477214486, 0.08735419472925943, -8.17512094926866, -0.6115011830490844, 0.8674898888742191
+    ensemble_accuracy_array = func_el_accu_real_((n,d), 0.00619747553944022,0.9568228080564991, -1.454758262368701,
+                                                 0.012740189566104681, 0.9097711302793287, 7.941770938540026,
+                                                 -624.9072262322427, -6.3037240708956865, 0.6317818274343889
+
 )
     return ensemble_accuracy_array
 
 
-def func_diversity(data):
-    n, d = data  # x: N, y: D
-    avg_data = np.sum(d)/n
-    diversity = func_div((n, avg_data), 0.041532460624358634, 0.04478891097316841, -0.05664426934296566,
-                         1204.12249783061, 0.48314768895059695, 0.09228750044071597, -0.1845742960888511,
-                         -1200.3358162964912, 0.0007045734037329085
-)
-    return diversity
+# def func_diversity(data):
+#     n, d = data  # x: N, y: D
+#     avg_data = np.sum(d)/n
+#     diversity = func_div((n, avg_data), 0.041532460624358634, 0.04478891097316841, -0.05664426934296566,
+#                          1204.12249783061, 0.48314768895059695, 0.09228750044071597, -0.1845742960888511,
+#                          -1200.3358162964912, 0.0007045734037329085
+# )
+#     return diversity
 
 def plot_3d(x,y,z, legend,xlabel,ylabel,zlabel,rst):
     fig, ax = plt.subplots(figsize=(4, 3))
@@ -162,10 +167,10 @@ def plot_2d(x,y,xlabel,ylabel,marker,rst,xlim=None,ylim=None, y_major=None,rolli
     sfig.savefig(rst, format="pdf", bbox_inches='tight')
     plt.show()
 
-
 def plot_2d_mul_lines(x,y,xlabel,ylabel,linestyle,marker,label,rst,xlim=None,ylim=None, y_major=None,rolling=None):
     fig = plt.figure(figsize=(4, 3))
     for i in range(len(y)):
+
         plt.plot(x, y[i], color=palette[i], linestyle=linestyle[i], label=label[i])
     plt.xlabel(xlabel, fontsize=12)
     plt.ylabel(ylabel, fontsize=12)
@@ -186,7 +191,11 @@ def plot_2d_mul_lines(x,y,xlabel,ylabel,linestyle,marker,label,rst,xlim=None,yli
     plt.show()
 
 
+results_file_name = './results/cifar-ict-boosting'+'_'+str(datasize_method)+'_'+str(reward_method) +'.csv'
 
+with open(results_file_name, 'w') as f:
+    f.write('processing rate, gamma, payoff, no learner, Avg data size, latency, accuracy, no iteration, \n')
+    f.close()
 
 cost_rank = cost.argsort()  # increasing cost indices
 num_convergence_iter_list = []
@@ -195,14 +204,16 @@ data_size_learner_list = []
 total_delay_list = []
 EL_diversity_list = []
 EL_accuracy_list = []
+
 for r in range(len(rate_list)):
 
     num_convergence_iter = []
     num_joint = []
     data_size_learner = []
     total_delay = []
-    EL_diversity = []
+    # EL_diversity = []
     EL_accuracy = []
+    total_payoff = []
 
     reward = np.ones(num_of_base_learners)
     learner_decision = np.ones(num_of_base_learners)
@@ -215,7 +226,7 @@ for r in range(len(rate_list)):
         num_iter = 0
         total_server_payoff = 0
         total_server_payoff_old = 0
-        while num_iter < 100 and (num_iter == 0 or total_server_payoff != total_server_payoff_old):
+        while num_iter < 20 and (num_iter == 0 or total_server_payoff != total_server_payoff_old):
             num_iter += 1
 
 
@@ -226,17 +237,25 @@ for r in range(len(rate_list)):
             server_payoff = gamma * el_accu_candidate
             for n in range(num_of_base_learners):
                 if learner_decision[n]:
-                    server_payoff -= cost[n] * d_candidate + d_candidate/rate_list[r][n]
+                    if reward_method == 'adapt':
+                        server_payoff -= cost[n] * d_candidate + d_candidate / rate_list[r][n]
+                    else:
+                        server_payoff -= reward_method + d_candidate / rate_list[r][n]
+                    # server_payoff -= cost[n] * d_candidate + d_candidate / rate_list[r][n]
             max_payoff_index = server_payoff.argsort()[len(server_payoff) - 1]
             max_payoff = server_payoff[max_payoff_index]
-            best_data_size = d_candidate[max_payoff_index]
+            # determine D
+            if datasize_method == 'adapt':
+                best_data_size = d_candidate[max_payoff_index]
+            else:
+                best_data_size = datasize_method
 
             # determine R
             for n in range(num_of_base_learners):
-                if learner_decision[n]:
+                if reward_method == 'adapt':
                     reward[n] = cost[n] * best_data_size
                 else:
-                    reward[n] = 0
+                    reward[n] = reward_method
 
 
             # determine N
@@ -249,12 +268,15 @@ for r in range(len(rate_list)):
                 el_accu_no_participate = gamma * func_el_accu_real((n_join_other,best_data_size))
                 el_accu_participate = gamma * func_el_accu_real((n_join_other+1,best_data_size))
                 server_payoff_dif = el_accu_participate - el_accu_no_participate
-                if n_join_other <= 1 or (server_payoff_dif >= cost[learner_index] * best_data_size):# and el_accu_no_participate >= 0):
-                    learner_decision[learner_index] = 1
-                    reward[n] = cost[learner_index] * best_data_size
+                if n_join_other <= 1 or (server_payoff_dif >= reward[learner_index] +best_data_size/rate_list[r][learner_index]):# and el_accu_no_participate >= 0):
+                    if reward[learner_index] >= cost[learner_index] * best_data_size:
+                        learner_decision[learner_index] = 1
+                    else:
+                        learner_decision[learner_index] = 0
+                        reward[learner_index] = 0
                 else:
                     learner_decision[learner_index] = 0
-                    reward[n] = 0
+                    reward[learner_index] = 0
 
             total_server_payoff_old = total_server_payoff
             n_join = np.sum(learner_decision)
@@ -265,23 +287,29 @@ for r in range(len(rate_list)):
                 if learner_decision[n]:
                     total_server_payoff -= reward[n] + best_data_size / rate_list[r][n]
                     delay += best_data_size / rate_list[r][n]
-            diversity = func_diversity((n_join, best_data_size))
+            # diversity = func_diversity((n_join, best_data_size))
 
-            print("iter" + str(num_iter) + " total server payoff: " + str(total_server_payoff) + " # learners:" + str(n_join) + " data size:" + str(best_data_size) + " diversity:" + str(diversity) + " accuracy:" + str(el_accu))
-
+            # print("iter" + str(num_iter) + " total server payoff: " + str(total_server_payoff) + " # learners:" + str(n_join) + " data size:" + str(best_data_size) + " diversity:" + str(diversity) + " accuracy:" + str(el_accu))
+            print("iter" + str(num_iter) + " total server payoff: " + str(total_server_payoff) + " # learners:" + str(
+                n_join) + " data size:" + str(best_data_size) + " accuracy:" + str(el_accu))
 
         num_convergence_iter.append(num_iter)
         num_joint.append(n_join)
         data_size_learner.append(best_data_size)
         total_delay.append(delay)
-        EL_diversity.append(diversity)
+        # EL_diversity.append(diversity)
         EL_accuracy.append(el_accu)  # el_accu_real
+        total_payoff.append(total_server_payoff)
+
+        with open(results_file_name, 'a') as f:
+            f.write(str(rate_mean_list[r]) + ',' + str(gamma)+ ',' + str(total_server_payoff) + ',' + str(n_join) + ',' + str(best_data_size) + ',' + str(delay) + ',' + str(el_accu) + ',' + str(num_iter) + '\n')
+            f.close()
 
     num_convergence_iter_list.append(np.array(num_convergence_iter))
     num_joint_list.append(np.array(num_joint))
     data_size_learner_list.append(np.array(data_size_learner))
     total_delay_list.append(np.array(total_delay))
-    EL_diversity_list.append(np.array(EL_diversity)+0.02)
+    # EL_diversity_list.append(np.array(EL_diversity)+0.02)
     EL_accuracy_list.append(np.array(EL_accuracy)-0.05)
 
 
@@ -290,18 +318,20 @@ x = np.array(gamma_list)
 marker_list = [".",".",".",".",".",".","o","s",".","d","o","d",".","d","o","s"]
 linestyle_list = ["-","-.",":","--","-","-.",":","--","-","-.",":","--"]
 
-label_list = [r'$\lambda=200$',r'$\lambda=400$',r'$\lambda=600$',r'$\lambda=800$',r'$\lambda=5$',r'$\lambda=6$',r'$\lambda=7$',r'$\lambda=8$',r'$\lambda=9$',r'$\lambda=10$']
+label_list = [r'$\lambda=100$',r'$\lambda=200$',r'$\lambda=300$',r'$\lambda=400$',r'$\lambda=5$',r'$\lambda=6$',r'$\lambda=7$',r'$\lambda=8$',r'$\lambda=9$',r'$\lambda=10$']
 
-plot_2d_mul_lines(x, num_convergence_iter_list, r'$\gamma$','# iterations', linestyle_list, marker_list, label_list,'./results/mnist-ict-cov-boosting.pdf', y_major=1)
+file_name = '_'+str(datasize_method)+'_'+str(reward_method) +'.pdf'
 
-plot_2d_mul_lines(x, num_joint_list, r'$\gamma$','# participating learners', linestyle_list, marker_list, label_list,'./results/mnist-ict-num-learner-boosting.pdf.pdf')
+plot_2d_mul_lines(x, num_convergence_iter_list, r'$\gamma$','# iterations', linestyle_list, marker_list, label_list,'./results/cifar-ict-cov-boosting'+file_name, y_major=5)
 
-plot_2d_mul_lines(x,data_size_learner_list,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/mnist-ict-el-d-boosting.pdf')
+plot_2d_mul_lines(x, num_joint_list, r'$\gamma$','# participating learners', linestyle_list, marker_list, label_list,'./results/cifar-ict-num-learner-boosting'+file_name)
 
-plot_2d_mul_lines(x,total_delay_list,r'$\gamma$','Latency', linestyle_list, marker_list, label_list,'./results/mnist-ict-delay-boosting.pdf')#,xlim=(1,6000))
+plot_2d_mul_lines(x,data_size_learner_list,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/cifar-ict-el-d-boosting'+file_name)
 
-plot_2d_mul_lines(x,EL_diversity_list,r'$\gamma$','Diversity', linestyle_list, marker_list, label_list,'./results/mnist-ict-div-boosting.pdf')#,xlim=(1,6000))
+plot_2d_mul_lines(x,total_delay_list,r'$\gamma$','Latency', linestyle_list, marker_list, label_list,'./results/cifar-ict-delay-boosting'+file_name)#,xlim=(1,6000))
 
-plot_2d_mul_lines(x,EL_accuracy_list,r'$\gamma$','Ensemble accuracy', linestyle_list, marker_list, label_list,'./results/mnist-ict-elaccu-boosting.pdf', y_major=0.02)#,xlim=(1,6000))
+# plot_2d_mul_lines(x,EL_diversity_list,r'$\gamma$','Diversity', linestyle_list, marker_list, label_list,'./results/cifar-ict-div-boosting.pdf')#,xlim=(1,6000))
+
+plot_2d_mul_lines(x,EL_accuracy_list,r'$\gamma$','Ensemble accuracy', linestyle_list, marker_list, label_list,'./results/cifar-ict-elaccu-boosting'+file_name, y_major=0.02)#,xlim=(1,6000))
 
 exit_breakpoint = True

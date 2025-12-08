@@ -16,7 +16,10 @@ device = torch.device('cuda:0') if use_gpu else torch.device('cpu')
 
 
 dataset = 'MNIST'
-model_name = 'ModelCNNMnist'  # 'ModelCNNMnist', 'LeNet5', 'LeNet5Half'
+model_name = 'logReg'
+
+# dataset = 'cifar10'
+# model_name = 'ResNet18'  # 'ModelCNNCifar10', 'ResNet18', 'ResNet34'
 
 
 optimizer = 'Adam'
@@ -29,3 +32,6 @@ num_iter_one_output = 200
 num_of_base_learners = args.n  # 10,20,30,40,50, 60,70,80,90,100
 dataset_file_path = os.path.join(os.path.dirname(__file__), 'dataset_data_files')
 results_file_path = os.path.join(os.path.dirname(__file__), 'results/')
+
+datasize_method = 'adapt'  # 'adapt' or a number
+reward_method = 'adapt'  # 'adapt' or a number

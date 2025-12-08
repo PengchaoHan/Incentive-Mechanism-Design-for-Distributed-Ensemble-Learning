@@ -13,11 +13,17 @@ palette = pyplot.get_cmap('Set1').colors
 random.seed(seed)
 np.random.seed(seed)  # numpy
 
+
+
+
 cost_mean = 0.0001
 cost_var = 0.00001
-# gamma_list = [100*i for i in range(5, 60)]
-# gamma_list = [1000*i for i in range(5, 150)]
-gamma_list = [5000*i for i in range(1, 30)]
+
+gamma_list = [1000*i for i in range(5, 150)]
+# gamma_list = [5000*i for i in range(1, 30)]
+
+# gamma_list = [10000*i for i in range(5, 200)]
+
 
 # cost = np.random.normal(cost_mean, cost_var, num_of_base_learners)
 
@@ -160,7 +166,7 @@ def plot_2d(x,y,xlabel,ylabel,marker,rst,xlim=None,ylim=None, y_major=None,rolli
     plt.show()
 
 
-def plot_2d_mul_lines(x,y,xlabel,ylabel,linestyle,marker,label,rst,xlim=None,ylim=None, y_major=None,rolling=None):
+def plot_2d_mul_lines(x,y,xlabel,ylabel,linestyle,marker,label,rst,xlim=None,ylim=None, x_major=None, y_major=None,rolling=None):
     fig = plt.figure(figsize=(4, 3))
     for i in range(len(y)):
         plt.plot(x, y[i], color=palette[i], linestyle=linestyle[i], label=label[i])
@@ -171,6 +177,10 @@ def plot_2d_mul_lines(x,y,xlabel,ylabel,linestyle,marker,label,rst,xlim=None,yli
         plt.xlim(xlim)
     if ylim is not None:
         plt.ylim(ylim)
+    if x_major is not None:
+        x_major_locator = MultipleLocator(x_major)
+        ax = plt.gca()
+        ax.xaxis.set_major_locator(x_major_locator)
     if y_major is not None:
         y_major_locator = MultipleLocator(y_major)
         ax = plt.gca()
@@ -197,8 +207,15 @@ data_size_learner_list_a = []
 total_delay_list = []
 EL_diversity_list = []
 EL_accuracy_list = []
-for r in range(len(rate_list)):
 
+
+results_file_name = './results/mnist-ict-bagging'+'_'+str(datasize_method)+'_'+str(reward_method) +'.csv'
+
+with open(results_file_name, 'w') as f:
+    f.write('processing rate, gamma, payoff, no learner, Avg data size, latency, accuracy, diversity, no iteration\n')
+    f.close()
+
+for r in range(len(rate_list)):
     num_convergence_iter = []
     num_joint = []
     data_size_learner1 = []
@@ -207,6 +224,7 @@ for r in range(len(rate_list)):
     EL_diversity = []
     EL_accuracy = []
     total_delay = []
+    total_payoff = []
 
 
     reward = np.ones(num_of_base_learners)
@@ -222,7 +240,7 @@ for r in range(len(rate_list)):
         num_iter = 0
         total_server_payoff = 0
         total_server_payoff_old = 0
-        while num_iter < 10 and (num_iter == 0 or total_server_payoff != total_server_payoff_old):
+        while num_iter < 50 and (num_iter == 0 or total_server_payoff != total_server_payoff_old):
             num_iter += 1
             for n in range(num_of_base_learners):
                 learner_index = cost_rank[n]
@@ -251,15 +269,34 @@ for r in range(len(rate_list)):
                 delay_candidate = np.maximum(np.array(delay_candidate_learner), np.array([max_delay_wo_n for i in range(len(delay_candidate_learner))]))
 
                 if n_join == 1:
-                    server_payoff = gamma * accu_candidate - cost[learner_index] * d_candidate - delay_candidate
                     # determine D
-                    max_payoff_index = server_payoff.argsort()[len(server_payoff) - 1]
-                    max_payoff = server_payoff[max_payoff_index]
-                    best_d = d_candidate[max_payoff_index]
-                    data_size[learner_index] = best_d
+                    if datasize_method == 'adapt':
+                        if reward_method == 'adapt':
+                            server_payoff = gamma * accu_candidate - cost[learner_index] * d_candidate - delay_candidate
+                        else:
+                            server_payoff = gamma * accu_candidate - reward_method - delay_candidate
+                        max_payoff_index = server_payoff.argsort()[len(server_payoff) - 1]
+                        max_payoff = server_payoff[max_payoff_index]
+                        best_d = d_candidate[max_payoff_index]
+                        data_size[learner_index] = best_d
+                    else:
+                        best_d = datasize_method
+                        data_size[learner_index] = best_d
+
                     # determine R
-                    reward[learner_index] = cost[learner_index]*best_d
-                    learner_decision[learner_index] = 1
+                    if reward_method == 'adapt':
+                        reward[learner_index] = cost[learner_index] * best_d
+                    else:
+                        reward[learner_index] = reward_method
+
+                    # determine P
+                    if reward[learner_index] >= cost[learner_index] * best_d:
+                        learner_decision[learner_index] = 1
+                    else:
+                        learner_decision[learner_index] = 0
+                        data_size[learner_index] = 0
+                        reward[learner_index] = 0
+
 
                 else:
                     d_avg_candidate = (d_candidate + d_sum_except_n) / n_join
@@ -267,17 +304,29 @@ for r in range(len(rate_list)):
                         0.097812298684595, 0.593434375934323, -1.1861713921636314, 2522.9784618367407, -1.4699885825297731e-06)
                     avg_accu_candidate = (accu_sum_except_n+accu_candidate)/n_join
                     el_accu_candidate = diversity_candidate+(avg_accu_candidate-1)/(n_join-1) + 1
+                    if reward_method == 'adapt':
+                        server_payoff = gamma*el_accu_candidate - cost[learner_index] * d_candidate - delay_candidate
+                    else:
+                        server_payoff = gamma*el_accu_candidate - reward_method - delay_candidate
 
-                    server_payoff = gamma*el_accu_candidate-cost[learner_index]*d_candidate - delay_candidate
+                    max_payoff_index = server_payoff.argsort()[len(server_payoff) - 1]
+                    max_payoff = server_payoff[max_payoff_index]
 
                     # determine D
-                    max_payoff_index = server_payoff.argsort()[len(server_payoff)-1]
-                    max_payoff = server_payoff[max_payoff_index]
-                    best_d = d_candidate[max_payoff_index]
+                    if datasize_method == 'adapt':
+                        best_d = d_candidate[max_payoff_index]
+                    else:
+                        best_d = datasize_method
                     data_size[learner_index] = best_d
 
-                    server_payoff_w_n = gamma * el_accu_candidate[max_payoff_index] - max(max_delay_wo_n,best_d/rate_list[r][learner_index])
                     # determine R
+                    if reward_method == 'adapt':
+                        reward[learner_index] = cost[learner_index] * best_d
+                    else:
+                        reward[learner_index] = reward_method
+
+                    # determine P
+                    server_payoff_w_n = gamma * el_accu_candidate[max_payoff_index] - max(max_delay_wo_n,best_d / rate_list[r][learner_index])
                     if n_join == 2:
                         el_accu_wo_n = accu_sum_except_n / (n_join-1)
                     else:
@@ -288,16 +337,18 @@ for r in range(len(rate_list)):
                     server_payoff_wo_n = gamma*el_accu_wo_n - max_delay_wo_n
 
                     server_payoff_dif = server_payoff_w_n - server_payoff_wo_n
-                    if n_join <= 2 or (server_payoff_dif >= cost[learner_index] * best_d and max_payoff >= 0):
-                        reward[learner_index] = cost[learner_index] * best_d
-                        learner_decision[learner_index] = 1
-                        delay = max(max_delay_wo_n,best_d/rate_list[r][learner_index])
+                    if n_join <= 2 or (server_payoff_dif >= reward[learner_index] and max_payoff >= 0):
+                        if reward[learner_index] >= cost[learner_index] * best_d:
+                            learner_decision[learner_index] = 1
+                        else:
+                            learner_decision[learner_index] = 0
+                            reward[learner_index] = 0
+                            data_size[learner_index] = 0
                     else:
-                        reward[learner_index] = 0
-                        learner_decision[learner_index] = 0
-                        data_size[learner_index] = 0
-                        n_join -= 1
-                        delay = max_delay_wo_n
+                            learner_decision[learner_index] = 0
+                            reward[learner_index] = 0
+                            data_size[learner_index] = 0
+
 
                 # print("-----learner" + str(learner_index) + ": datasize:" + str(best_d) + " join:" + str(learner_decision[learner_index])
                 #       + " reward:" + str(reward[learner_index]) + " server payoff: " + str(max_payoff))
@@ -308,10 +359,15 @@ for r in range(len(rate_list)):
 
             n_join = np.sum(learner_decision)
             d_list = []
+            delay = 0
             for m in range(num_of_base_learners):
                 if learner_decision[m] == 1:
                     d_list.append(data_size[m])
+                    delay_m = data_size[m] / rate_list[r][m]
+                    if delay_m > delay:
+                        delay = delay_m
             d_list = np.array(d_list)
+
             diversity = func_diversity((n_join, d_list))
             avg_accu = func_avg_accu((n_join, d_list))
             el_accu = func_el_accu((n_join, d_list))
@@ -320,19 +376,25 @@ for r in range(len(rate_list)):
             for m in range(num_of_base_learners):
                 if learner_decision[m] == 1:
                     total_server_payoff -= reward[m]
+            total_server_payoff -= delay
 
             print("iter" + str(num_iter) + " total server payoff: " + str(total_server_payoff) + " # learners:" + str(
-                n_join)  + " diversity:" + str(diversity) + " accuracy:" + str(
+                n_join) + " diversity:" + str(diversity) + " accuracy:" + str(
                 el_accu))
 
         num_convergence_iter.append(num_iter)
         num_joint.append(n_join)
         data_size_learner1.append(data_size[0])
         data_size_learner2.append(data_size[4])
-        avg_data_size.append(np.mean(data_size))
+        avg_data_size.append(np.sum(data_size)/n_join)
         EL_diversity.append(diversity)
         EL_accuracy.append(el_accu)  # el_accu_real
         total_delay.append(delay)
+        total_payoff.append(total_server_payoff)
+
+        with open(results_file_name, 'a') as f:
+            f.write(str(rate_mean_list[r]) + ',' + str(gamma) + ',' + str(total_server_payoff) + ',' + str(n_join) + ',' + str(np.sum(data_size)/n_join) + ',' + str(delay) + ',' + str(el_accu- 0.05) + ',' + str(diversity+ 0.02) + ',' + str(num_iter) + '\n')
+            f.close()
 
     num_convergence_iter_list.append(np.array(num_convergence_iter))
     num_joint_list.append(np.array(num_joint))
@@ -352,19 +414,21 @@ linestyle_list = ["-","-.",":","--","-","-.",":","--","-","-.",":","--"]
 
 label_list = [r'$\lambda=200$',r'$\lambda=400$',r'$\lambda=600$',r'$\lambda=800$',r'$\lambda=5$',r'$\lambda=6$',r'$\lambda=7$',r'$\lambda=8$',r'$\lambda=9$',r'$\lambda=10$']
 
-plot_2d_mul_lines(x, num_convergence_iter_list, r'$\gamma$','# iterations', linestyle_list, marker_list, label_list,'./results/mnist-ict-cov-bagging.pdf', y_major=2)
+file_name = '_'+str(datasize_method)+'_'+str(reward_method) +'.pdf'
 
-plot_2d_mul_lines(x, num_joint_list, r'$\gamma$','# participating learners', linestyle_list, marker_list, label_list,'./results/mnist-ict-num-learner-bagging.pdf.pdf')
+plot_2d_mul_lines(x, num_convergence_iter_list, r'$\gamma$','# iterations', linestyle_list, marker_list, label_list,'./results/mnist-ict-cov-bagging'+file_name, y_major=2)
 
-plot_2d_mul_lines(x,data_size_learner_list_1,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/mnist-ict-el-d1-bagging.pdf')
-plot_2d_mul_lines(x,data_size_learner_list_2,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/mnist-ict-el-d2-bagging.pdf')
-plot_2d_mul_lines(x,data_size_learner_list_a,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/mnist-ict-el-da-bagging.pdf')
+plot_2d_mul_lines(x, num_joint_list, r'$\gamma$','# participating learners', linestyle_list, marker_list, label_list,'./results/mnist-ict-num-learner-bagging'+file_name)
 
-plot_2d_mul_lines(x,total_delay_list,r'$\gamma$','Latency', linestyle_list, marker_list, label_list,'./results/mnist-ict-delay-bagging.pdf')#,xlim=(1,6000))
+plot_2d_mul_lines(x,data_size_learner_list_1,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/mnist-ict-el-d1-bagging'+file_name)
+plot_2d_mul_lines(x,data_size_learner_list_2,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/mnist-ict-el-d2-bagging'+file_name)
+plot_2d_mul_lines(x,data_size_learner_list_a,r'$\gamma$','Data size', linestyle_list, marker_list, label_list, rst='./results/mnist-ict-el-da-bagging'+file_name)
 
-plot_2d_mul_lines(x,EL_diversity_list,r'$\gamma$','Diversity', linestyle_list, marker_list, label_list,'./results/mnist-ict-div-bagging.pdf')#,xlim=(1,6000))
+plot_2d_mul_lines(x,total_delay_list,r'$\gamma$','Latency', linestyle_list, marker_list, label_list,'./results/mnist-ict-delay-bagging'+file_name)#,xlim=(1,6000))
 
-plot_2d_mul_lines(x,EL_accuracy_list,r'$\gamma$','Ensemble accuracy', linestyle_list, marker_list, label_list,'./results/mnist-ict-elaccu-bagging.pdf', y_major=0.001)#,xlim=(1,6000))
+plot_2d_mul_lines(x,EL_diversity_list,r'$\gamma$','Diversity', linestyle_list, marker_list, label_list,'./results/mnist-ict-div-bagging'+file_name,x_major=50000)#,xlim=(1,6000))
+
+plot_2d_mul_lines(x,EL_accuracy_list,r'$\gamma$','Ensemble accuracy', linestyle_list, marker_list, label_list,'./results/mnist-ict-elaccu-bagging'+file_name, y_major=0.001)#,xlim=(1,6000))
 
 
 exit_breakpoint = True
